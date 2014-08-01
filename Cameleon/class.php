@@ -1,5 +1,8 @@
 <?php
 
+error_reporting(E_ALL | E_STRICT);
+ini_set('display_errors', 1);
+
 /**
 *
 * Cameleon; the theme changing plugin for WordPress
@@ -23,6 +26,7 @@ class Cameleon {
 		,'alias_key' => 'skin_alias'
 		,'theme_key' => 'skin_theme'
 		,'menu_icon' => 'dashicons-art'
+		,'nonce'	 => 'cameleon-nonce'
 	);
 
 	private static $theme = array();
@@ -48,8 +52,10 @@ class Cameleon {
 		add_action('init', array($class, 'add_rewrites'));
 		add_action('init', array($class, 'register'));
 		add_action('add_meta_boxes', array($class, 'add_meta_box'));
+		add_action('save_post', array($class, 'save_meta'));
 		add_action('plugins_loaded', array($class, 'switch_theme'));
 		add_action('wp_loaded', array($class, 'flush_rules'));
+		add_action('admin_enqueue_scripts', array($class, 'set_scripts'));
 
 		add_filter('query_vars', array($class, 'add_vars'));
 		add_filter('post_type_link', array($class,'post_link'), 1, 3);
@@ -148,6 +154,42 @@ class Cameleon {
 
 	/**
 	* 
+	* Saves the meta from the display_meta function
+	*
+	*/
+
+	public static function save_meta() {
+
+		$current = get_current_screen();
+		if ($current->base==='post' && $current->post_type===static::$settings['post_type']) {
+
+			$alias_key = static::$settings['alias_key'];
+			$theme_key = static::$settings['theme_key'];
+			$nonce = static::$settings['nonce'];
+			$post_type = static::$settings['post_type'];
+			$post_id = $_POST['post_ID'];
+
+			if (!isset($_POST[$nonce])) return;
+			if (!wp_verify_nonce($_POST[$nonce], $nonce)) return;
+			if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+			if (!current_user_can('edit_post',$post_id)) return;
+			if (!isset($_POST[$theme_key]) || !isset($_POST[$alias_key])) return;
+ 			
+ 			$aliases = '';
+ 			if (is_array($_POST[$alias_key])) {
+ 				for ($i=0; $i<count($_POST[$alias_key]); $i++) {
+ 					if (!static::is_valid_string($_POST[$alias_key][$i])) unset($_POST[$alias_key][$i]);
+ 				}
+ 				$aliases = json_encode($_POST[$alias_key]);
+ 			}
+
+			update_post_meta($post_id, $alias_key, sanitize_text_field($aliases));
+			update_post_meta($post_id, $theme_key, sanitize_text_field($_POST[$theme_key]));
+		}
+	}
+
+	/**
+	* 
 	* Displays the meta HTML when editing a skin.
 	*
 	* @param object $post The $post variable passed by WordPress
@@ -156,8 +198,9 @@ class Cameleon {
 
 		$alias_key = static::$settings['alias_key'];
 		$theme_key = static::$settings['theme_key'];
+		$nonce = static::$settings['nonce'];
 
-		wp_nonce_field('cameleon-nonce','cameleon-nonce');
+		wp_nonce_field($nonce,$nonce);
 
 		?>
 		<table class="form-table cameleon-fields">
@@ -166,7 +209,7 @@ class Cameleon {
 			<th class="header"><label>Theme:</label></th>
 			<td>
 			<select name="<?= $theme_key ?>" id="<?= $theme_key ?>">
-			<option value="">&nbsp;</option>
+			<option value="">-- Currently Active Theme --</option>
 			<?php
 
 			$themes_unfiltered = get_themes();
@@ -183,22 +226,29 @@ class Cameleon {
 			</select>
 			</td>
 		</tr>
+		<tr>
+			<th class="header"><label>Aliases:</label></th>
+			<td>
+				<div class="dashicons dashicons-plus-alt cmln-add-alias" title="Add New Alias"></div>
+				<div class="cmln-generated-aliases"></div>
+				<div class="cmln-alias-template">
+					<div class="cmln-alias-field-wrap">
+						<input type="text" name="<?= $alias_key ?>[]" id="<?= $alias_key ?>[]" class="cmln-alias-field" value="" />
+						<div class="dashicons dashicons-dismiss cmln-remove-alias" title="Remove This Alias"></div>
+					</div>
+				</div>
+				<?php
 
+				$aliases = get_post_meta($post->ID,$alias_key,true);
+				if (!$aliases) $aliases = '""';
+
+				?>
+				<script>var $cmln_aliases = <?= $aliases ?></script>
+			</td>
+		</tr>
+	
 		</table>
 		<?php
-
-		 /* 
-
-		 To Add:
-			
-			Repeater: alias urls
-			Taxonomy Selector: main - nav_menu
-			Taxonomy Selector: secondary - nav_menu
-			Taxonomy Selector: main_slideshow - nav_menu
-			Text: Email
-			Text: Phone
-
-		*/
 	}
 
 	/**
@@ -235,7 +285,7 @@ class Cameleon {
 				$urls[$site->ID][] = $site->post_name;
 				$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
 				
-				if (static::is_valid_string($addons) && unserialize($addons)) $addons = unserialize($addons);
+				if (static::is_valid_string($addons) && @json_decode($addons)) @$addons = json_decode($addons);
 				if (static::is_valid_array($addons)) {
 					foreach ($addons as $addon) {
 						$urls[$site->ID][] = $addon;
@@ -295,7 +345,7 @@ class Cameleon {
 		if (!$page_id) {
 			$metas = $wpdb->get_results("SELECT post_id,meta_value FROM ".$wpdb->postmeta." WHERE meta_key = '".static::$settings['alias_key']."'", ARRAY_A);
 			foreach ($metas as $meta) {
-				$addons = unserialize($meta['meta_value']);
+				@$addons = json_decode($meta['meta_value']);
 				if (static::is_valid_array($addons)) {
 					foreach ($addons as $addon) {
 						if ($addon==$url) $page_id = $meta['post_id'];
@@ -394,6 +444,18 @@ class Cameleon {
 	public static function flush_rules() {
 		if (isset($_POST['post_type']) && $_POST['post_type']==static::$settings['post_type']) {
 			flush_rewrite_rules();
+		}
+	}
+
+	/**
+	* 
+	* Enqueues styles and scripts
+	*/
+	public static function set_scripts() {
+		$current = get_current_screen();
+		if ($current->base==='post' && $current->post_type===static::$settings['post_type']) {
+			wp_enqueue_script(static::$settings['post_type'].'-edit-js', CMLN_URL.'js/edit.js','jquery', null, true );
+			wp_enqueue_style(static::$settings['post_type'].'-edit-css', CMLN_URL.'css/edit.css');
 		}
 	}
 }

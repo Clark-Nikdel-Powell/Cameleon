@@ -1,0 +1,22 @@
+.cmln-add-alias, .cmln-remove-alias {
+	cursor: pointer;
+	display: inline-block;
+	margin: .2em 0 0 0;
+}
+
+.cmln-alias-template {
+	display:none;
+}
+
+.cmln-alias-field {
+	width:15em;
+	display: inline-block;
+}
+
+.cmln-generated-aliases {
+	display: inline-block;
+}
+
+.cmln-alias-field-wrap {
+	display: block;
+}
