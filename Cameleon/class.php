@@ -1,8 +1,5 @@
 <?php
 
-error_reporting(E_ALL | E_STRICT);
-ini_set('display_errors', 1);
-
 /**
 *
 * Cameleon; the theme changing plugin for WordPress
@@ -201,10 +198,8 @@ class Cameleon {
 		$nonce = static::$settings['nonce'];
 
 		wp_nonce_field($nonce,$nonce);
-
 		?>
 		<table class="form-table cameleon-fields">
-
 		<tr>
 			<th class="header"><label>Theme:</label></th>
 			<td>
@@ -246,7 +241,6 @@ class Cameleon {
 				<script>var $cmln_aliases = <?= $aliases ?></script>
 			</td>
 		</tr>
-	
 		</table>
 		<?php
 	}
