@@ -6,6 +6,13 @@
 * 
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
+* @version 	  1.1
+*
+*
+* Upcoming features:
+*  - URL rewrite checking & notification (for notifying of existing rewrites)
+*  - Override theme switch when registered post type url rewrite is used (fixes conflicts)
+* 
 */
 
 class Cameleon {
@@ -239,6 +246,7 @@ class Cameleon {
 
 				?>
 				<script>var $cmln_aliases = <?= $aliases ?></script>
+				<p class="description cmln-desc">Using existing rewrite rules will cause conflicts. Be careful using this.</p>
 			</td>
 		</tr>
 		</table>
