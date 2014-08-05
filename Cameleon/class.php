@@ -31,10 +31,10 @@ class Cameleon {
 		,'theme_key' => 'skin_theme'
 		,'menu_icon' => 'dashicons-art'
 		,'nonce'	 => 'cameleon-nonce'
+		,'alias_warning' => 'Warning: using existing rewrite rules is prohibited.'
 	);
 
 	private static $theme = array();
-
 	private static $rewrites = array(
 		 '/(.+?)/(.+?)/?$' 	=> '?post_type=$matches[1]&post_name=$matches[2]'
 		,'/(.+?)/?$' 		=> '?post_type=$matches[1]'
@@ -60,6 +60,7 @@ class Cameleon {
 		add_action('plugins_loaded', array($class, 'switch_theme'));
 		add_action('wp_loaded', array($class, 'flush_rules'));
 		add_action('admin_enqueue_scripts', array($class, 'set_scripts'));
+		add_action('wp_ajax_check_alias', array($class, 'check_alias'));
 
 		add_filter('query_vars', array($class, 'add_vars'));
 		add_filter('post_type_link', array($class,'post_link'), 1, 3);
@@ -159,9 +160,7 @@ class Cameleon {
 	/**
 	* 
 	* Saves the meta from the display_meta function
-	*
 	*/
-
 	public static function save_meta() {
 
 		$current = get_current_screen();
@@ -183,6 +182,7 @@ class Cameleon {
  			if (is_array($_POST[$alias_key])) {
  				for ($i=0; $i<count($_POST[$alias_key]); $i++) {
  					if (!static::is_valid_string($_POST[$alias_key][$i])) unset($_POST[$alias_key][$i]);
+ 					else $_POST[$alias_key][$i] = sanitize_title($_POST[$alias_key][$i]);
  				}
  				$aliases = json_encode($_POST[$alias_key]);
  			}
@@ -190,6 +190,41 @@ class Cameleon {
 			update_post_meta($post_id, $alias_key, sanitize_text_field($aliases));
 			update_post_meta($post_id, $theme_key, sanitize_text_field($_POST[$theme_key]));
 		}
+	}
+
+	/**
+	* 
+	* Validates the Alias to avoid conflicts
+	*/
+	public static function check_alias() {
+		global $wp_rewrite;
+
+		$ret['status'] = 202;
+		$ret['message'] = static::$settings['alias_warning'];
+		$ret['errors'] = array();
+
+		$aliases = $_POST['aliases'];
+		if (is_object($wp_rewrite) && isset($aliases) && count($aliases)>0) {
+
+			$current_aliases_meta = get_post_meta($_POST['post'],static::$settings['alias_key'],true);
+			$current_aliases = json_decode($current_aliases_meta);
+
+			$rules = $wp_rewrite->rules;
+			$rules_e = $wp_rewrite->extra_rules;
+			$rules_e_top = $wp_rewrite->extra_rules_top;
+			$end = '/?$';
+
+			foreach ($aliases as $name=>$alias) {
+				if ((isset($rules[$alias.$end]) || isset($rules_e[$alias.$end]) || isset($rules_e_top[$alias.$end])) && !in_array($alias,$current_aliases)) $ret['errors'][] = $name;
+				elseif (count(array_keys($aliases,$alias))>1) $ret['errors'][] = $name;
+			}
+			if (count($ret['errors'])>0) {
+				$ret['status'] = 500;
+				$ret['message'] = 'This alias already exists as a rewrite rule, alias, or is listed twice above. Publish has been disabled.';
+			}
+		}
+		echo json_encode($ret);
+		die();
 	}
 
 	/**
@@ -210,7 +245,7 @@ class Cameleon {
 		<tr>
 			<th class="header"><label>Theme:</label></th>
 			<td>
-			<select name="<?= $theme_key ?>" id="<?= $theme_key ?>">
+			<select name="<?php echo $theme_key ?>" id="<?php echo $theme_key ?>">
 			<option value="">-- Currently Active Theme --</option>
 			<?php
 
@@ -221,7 +256,7 @@ class Cameleon {
 				foreach ($themes_unfiltered as $themename=>$themedata) {
 					$selected = '';
 					if ($themedata->template==get_post_meta($post->ID,$theme_key,true)) $selected=' selected="selected"';
-					?><option value="<?= $themedata->template ?>"<?= $selected ?>><?= $themedata->name ?></option><?php
+					?><option value="<?php echo $themedata->template ?>"<?php echo $selected ?>><?php echo $themedata->name ?></option><?php
 				}
 			}
 			?>
@@ -232,25 +267,59 @@ class Cameleon {
 			<th class="header"><label>Aliases:</label></th>
 			<td>
 				<div class="dashicons dashicons-plus-alt cmln-add-alias" title="Add New Alias"></div>
-				<div class="cmln-generated-aliases"></div>
-				<div class="cmln-alias-template">
-					<div class="cmln-alias-field-wrap">
-						<input type="text" name="<?= $alias_key ?>[]" id="<?= $alias_key ?>[]" class="cmln-alias-field" value="" />
-						<div class="dashicons dashicons-dismiss cmln-remove-alias" title="Remove This Alias"></div>
-					</div>
-				</div>
-				<?php
-
-				$aliases = get_post_meta($post->ID,$alias_key,true);
-				if (!$aliases) $aliases = '""';
-
-				?>
-				<script>var $cmln_aliases = <?= $aliases ?></script>
-				<p class="description cmln-desc">Using existing rewrite rules will cause conflicts. Be careful using this.</p>
+				<div class="cmln-generated-aliases"><?php echo static::load_aliases($post->ID,$alias_key); ?></div>
+				<div class="cmln-alias-template"><?php echo static::load_alias_template($alias_key,'',false); ?></div>
+				<br/>
+				<p class="description cmln-desc"><?php echo static::$settings['alias_warning'] ?></p>
 			</td>
 		</tr>
 		</table>
 		<?php
+	}
+
+	/**
+	* 
+	* Loads the alias template for the admin settings page
+	*
+	* @param string $alias The alias to populate
+	* @param string $key The meta key being used
+	* @return string
+	*/
+	public static function load_alias_template($key,$alias='',$idnum=1) {
+
+		if ($idnum!==false) $id = $key.'_'.$idnum;
+		else $id = $key;
+
+		ob_start();
+		?>
+		<div class="cmln-alias-field-wrap">
+			<input type="text" name="<?php echo $key ?>[]" id="<?php echo $id ?>" class="cmln-alias-field" value="<?php echo $alias ?>" />
+			<div class="dashicons dashicons-dismiss cmln-remove-alias" title="Remove This Alias"></div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	* 
+	* Loads all the current aliases from meta
+	*
+	* @param object $pid The post ID to load the meta for
+	* @param string $key The meta key being used
+	* @return string
+	*/
+	private static function load_aliases($pid,$key) {
+		$ret = '';
+		$aliases = get_post_meta($pid,$key,true);
+		if ($aliases && $alias_json = json_decode($aliases)) {
+			$id = 0;
+			foreach ($alias_json as $alias) {
+				$ret .= static::load_alias_template($key,$alias,$id);
+				$id++;
+			}
+		}
+		else $ret .= static::load_alias_template($key);
+		return $ret;
 	}
 
 	/**
@@ -393,10 +462,8 @@ class Cameleon {
 		static::$theme['stylesheet'] = $stylesheet;
 
 		$class = get_called_class();
-
 		add_filter('template', array($class, 'theme_filter_template'));
 		add_filter('stylesheet', array($class, 'theme_filter_style'));
-
 		add_filter('sidebars_widgets', array($class, 'theme_filter_widgets'));
 		add_filter('theme_mod_{sidebars_widgets}', array($class, 'theme_filter_widgets'));
 
@@ -454,10 +521,17 @@ class Cameleon {
 	* Enqueues styles and scripts
 	*/
 	public static function set_scripts() {
+
 		$current = get_current_screen();
 		if ($current->base==='post' && $current->post_type===static::$settings['post_type']) {
+
 			wp_enqueue_script(static::$settings['post_type'].'-edit-js', CMLN_URL.'js/edit.js','jquery', null, true );
 			wp_enqueue_style(static::$settings['post_type'].'-edit-css', CMLN_URL.'css/edit.css');
+
+			$data['url'] = admin_url('admin-ajax.php');
+			$data['action'] = 'check_alias';
+
+			wp_localize_script(static::$settings['post_type'].'-edit-js','cmln',$data);
 		}
 	}
 }

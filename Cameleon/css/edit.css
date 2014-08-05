@@ -1,11 +1,9 @@
 .cmln-add-alias, .cmln-remove-alias {
 	cursor: pointer;
 	display: inline-block;
-	margin: .2em 0 0 0;
-}
-
-.cmln-alias-template {
-	display:none;
+	margin: .02em 0 0 0;
+	padding: 0 .2em 0 0;
+	font-size: 2.1em;
 }
 
 .cmln-alias-field {
@@ -13,14 +11,18 @@
 	display: inline-block;
 }
 
-.cmln-generated-aliases {
+.cmln-generated-aliases { display: inline-block;}
+.cmln-alias-field-wrap { display: block;}
+.cmln-alias-template { display:none; }
+
+p.cmln-desc { 
+	padding: 1em;
 	display: inline-block;
 }
 
-.cmln-alias-field-wrap {
-	display: block;
+.cmln-error {
+	color: #d00 !important;
+	font-weight: bold !important;
 }
 
-p.cmln-desc {
-	padding: 1em;
-}
+input.cmln-alias-field.cmln-field-error { border-left: 3px solid #d00 ; }
