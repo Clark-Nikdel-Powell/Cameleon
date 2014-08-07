@@ -214,9 +214,16 @@ class Cameleon {
 			$rules_e_top = $wp_rewrite->extra_rules_top;
 			$end = '/?$';
 
+			/*
+				ADD IN DETECTION FOR REGISTERED POST TYPES
+			*/
+
 			foreach ($aliases as $name=>$alias) {
-				if ((isset($rules[$alias.$end]) || isset($rules_e[$alias.$end]) || isset($rules_e_top[$alias.$end])) && !in_array($alias,$current_aliases)) $ret['errors'][] = $name;
-				elseif (count(array_keys($aliases,$alias))>1) $ret['errors'][] = $name;
+				$fail = false;
+				if ((isset($rules[$alias.$end]) || isset($rules_e[$alias.$end]) || isset($rules_e_top[$alias.$end])) && !in_array($alias,$current_aliases)) $fail = true;
+				elseif (count(array_keys($aliases,$alias))>1) $fail = true;
+
+				if ($fail===true) $ret['errors'][] = $name;
 			}
 			if (count($ret['errors'])>0) {
 				$ret['status'] = 500;
