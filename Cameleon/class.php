@@ -3,7 +3,7 @@
 /**
 *
 * Cameleon; the theme changing plugin for WordPress
-* 
+*
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
 * @version 	  1.1
@@ -12,7 +12,7 @@
 * Upcoming features:
 *  - URL rewrite checking & notification (for notifying of existing rewrites)
 *  - Override theme switch when registered post type url rewrite is used (fixes conflicts)
-* 
+*
 */
 
 class Cameleon {
@@ -42,7 +42,7 @@ class Cameleon {
 	);
 
 	/**
-	* 
+	*
 	* Adds Wordpress actions and filters
 	*
 	* @param array $settings An array of settings to use
@@ -67,7 +67,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Adds the query string variable
 	*
 	* @param array $vars  WordPress's query variables
@@ -79,7 +79,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Tests a variable to see if it's a valid array with content
 	*
 	* @param array $arr  the array to be compared
@@ -91,7 +91,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Registers WordPress post type for skins
 	*/
 	public static function register() {
@@ -129,7 +129,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Sets post links to root instead of under url/post_type/name
 	*/
 	public static function post_link($post_link,$id=0) {
@@ -142,7 +142,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Adds the meta boxes to store meta info for skins
 	*/
 	public static function add_meta_box() {
@@ -154,11 +154,11 @@ class Cameleon {
 			$post_type,
 			'normal',
 			'default'
-		);		
+		);
 	}
 
 	/**
-	* 
+	*
 	* Saves the meta from the display_meta function
 	*/
 	public static function save_meta() {
@@ -177,7 +177,7 @@ class Cameleon {
 			if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
 			if (!current_user_can('edit_post',$post_id)) return;
 			if (!isset($_POST[$theme_key]) || !isset($_POST[$alias_key])) return;
- 			
+
  			$aliases = '';
  			if (is_array($_POST[$alias_key])) {
  				for ($i=0; $i<count($_POST[$alias_key]); $i++) {
@@ -193,7 +193,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Validates the Alias to avoid conflicts
 	*/
 	public static function check_alias() {
@@ -228,7 +228,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Displays the meta HTML when editing a skin.
 	*
 	* @param object $post The $post variable passed by WordPress
@@ -278,7 +278,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Loads the alias template for the admin settings page
 	*
 	* @param string $alias The alias to populate
@@ -301,7 +301,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Loads all the current aliases from meta
 	*
 	* @param object $pid The post ID to load the meta for
@@ -323,7 +323,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Tests a string to see if it's a valid string with actual length
 	*
 	* @param string $str  The string to be compared
@@ -335,7 +335,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Gets the list of sites and their associated urls
 	*
 	* @return array
@@ -355,7 +355,7 @@ class Cameleon {
 
 				$urls[$site->ID][] = $site->post_name;
 				$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
-				
+
 				if (static::is_valid_string($addons) && @json_decode($addons)) @$addons = json_decode($addons);
 				if (static::is_valid_array($addons)) {
 					foreach ($addons as $addon) {
@@ -370,7 +370,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Adds the rewrite rules into WordPress
 	*/
 	public static function add_rewrites() {
@@ -384,7 +384,7 @@ class Cameleon {
 						$var = static::$settings['query_arg'].'='.$site;
 						if (strlen($rewrite_to)>0) $var = '&'.$var;
 						else $var = '?'.$var;
-						
+
 						add_rewrite_rule(
 							 $url.$rewrite_match
 							,$rootpage.$rewrite_to.$var
@@ -397,7 +397,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Gets the theme for the current microsite
 	* by getting the theme meta by post name or alias name
 	*
@@ -433,32 +433,32 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Builds the theme info for switching and adds the appropriate WordPress filters
 	*/
 	public static function switch_theme() {
 
 		if (isset($_GET['preview'])) return false;
-		
+
 		$theme_name = static::get_theme();
-		$current_theme = get_current_theme();
+		$current_theme = wp_get_theme();
 
 		if (!$theme_name || $theme_name==$current_theme) return false;
 
 		$theme_data = wp_get_theme($theme_name);
 		if (!is_object($theme_data)) return;
-			 
+
 		$template = $theme_data['Template'];
 		$stylesheet = $theme_data['Stylesheet'];
 
 		$template = preg_replace('|[^a-z0-9_./-]|i', '', $template);
-		if (validate_file($template)) return false; 
-	 
+		if (validate_file($template)) return false;
+
 		$stylesheet = preg_replace('|[^a-z0-9_./-]|i', '', $stylesheet);
 		if (validate_file($stylesheet)) return false;
-	 
+
 		static::$theme['name'] = $theme_data['Name'];
-		static::$theme['template'] = $template; 
+		static::$theme['template'] = $template;
 		static::$theme['stylesheet'] = $stylesheet;
 
 		$class = get_called_class();
@@ -470,7 +470,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Checks theme template global variable and returns the template name for WordPress's use
 	*
 	* @return string
@@ -481,7 +481,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Checks theme template global variable and returns the stylesheet name for WordPress's use
 	*
 	* @return string
@@ -492,7 +492,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Gets sidebar widgets for the currently viewed theme instead of from the database option
 	* (see widgets.php in the Wordpress install for the function wp_get_sidebars_widgets()
 	*
@@ -507,7 +507,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Flushes rewrite rules on save of microsite
 	*/
 	public static function flush_rules() {
@@ -517,7 +517,7 @@ class Cameleon {
 	}
 
 	/**
-	* 
+	*
 	* Enqueues styles and scripts
 	*/
 	public static function set_scripts() {
@@ -535,4 +535,4 @@ class Cameleon {
 		}
 	}
 }
-		 
+
