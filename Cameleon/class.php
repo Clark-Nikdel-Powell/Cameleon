@@ -6,7 +6,7 @@
 *
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
-* @version 	  1.1
+* @version 	  1.2
 *
 *
 * Upcoming features:
@@ -64,6 +64,7 @@ class Cameleon {
 
 		add_filter('query_vars', array($class, 'add_vars'));
 		add_filter('post_type_link', array($class,'post_link'), 1, 3);
+		add_filter('site_url', array($class,'filter_url'));
 	}
 
 	/**
@@ -256,14 +257,14 @@ class Cameleon {
 			<option value="">-- Currently Active Theme --</option>
 			<?php
 
-			$themes_unfiltered = get_themes();
+			$themes_unfiltered = wp_get_themes();
 			$themes = array();
 
 			if (count($themes_unfiltered)>0) {
 				foreach ($themes_unfiltered as $themename=>$themedata) {
 					$selected = '';
-					if ($themedata->template==get_post_meta($post->ID,$theme_key,true)) $selected=' selected="selected"';
-					?><option value="<?php echo $themedata->template ?>"<?php echo $selected ?>><?php echo $themedata->name ?></option><?php
+					if ($themename==get_post_meta($post->ID,$theme_key,true)) $selected=' selected="selected"';
+					?><option value="<?php echo $themename ?>"<?php echo $selected ?>><?php echo $themedata->name ?></option><?php
 				}
 			}
 			?>
@@ -355,16 +356,16 @@ class Cameleon {
 		);
 
 		$sites = get_posts($args);
+		$urls = array();
 		if (static::is_valid_array($sites)) {
 
-			$urls = array();
 			foreach ($sites as $site) {
 
 				$urls[$site->ID][] = $site->post_name;
 				$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
 
 				if (static::is_valid_string($addons) && @json_decode($addons)) @$addons = json_decode($addons);
-				if (static::is_valid_array($addons)) {
+				if (static::is_valid_array($addons) && count($addons)>0) {
 					foreach ($addons as $addon) {
 						$urls[$site->ID][] = $addon;
 					}
@@ -540,6 +541,15 @@ class Cameleon {
 
 			wp_localize_script(static::$settings['post_type'].'-edit-js','cmln',$data);
 		}
+	}
+
+	/**
+	*
+	* Filters site url
+	*/
+	public static function filter_url($url) {
+
+		return $url;
 	}
 }
 
