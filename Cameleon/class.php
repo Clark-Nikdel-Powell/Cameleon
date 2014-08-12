@@ -6,7 +6,7 @@
 *
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
-* @version 	  1.2
+* @version 	  1.3
 *
 *
 * Upcoming features:
@@ -26,7 +26,7 @@ class Cameleon {
 	*/
 	private static $settings = array(
 		 'query_arg' => 'cameleon'
-		,'post_type' => 'skin'
+		,'post_type' => 'skin' 
 		,'alias_key' => 'skin_alias'
 		,'theme_key' => 'skin_theme'
 		,'menu_icon' => 'dashicons-art'
@@ -35,10 +35,19 @@ class Cameleon {
 	);
 
 	private static $theme = array();
+	/*
+	
+	ADD CATEGORY, TAGS urls
+
+	*/
 	private static $rewrites = array(
-		 '/(.+?)/(.+?)/?$' 	=> '?post_type=$matches[1]&post_name=$matches[2]'
-		,'/(.+?)/?$' 		=> '?post_type=$matches[1]'
-		,'/?$'				=> ''
+		 '/(.+?)/page/?([0-9]{1,})/?$' => '?post_type=$matches[1]&paged=$matches[2]'
+		,'/(.+?)/tagged-as/(.+?)/?$' => '?$matches[1]-tag=$matches[2]'
+		,'/(.+?)/category/(.+?)/paged/?([0-9]{1,})/?$' => '?$matches[1]-category=$matches[2]&paged=$matches[3]'
+		,'/(.+?)/category/(.+?)/?$' => '?$matches[1]-category=$matches[2]'
+		,'/(.+?)/(.+?)/?$' => '?post_type=$matches[1]&$matches[1]=$matches[2]&name=$matches[2]'
+		,'/(.+?)/?$' => '?post_type=$matches[1]'
+		,'/?$' => ''
 	);
 
 	/**
@@ -58,13 +67,15 @@ class Cameleon {
 		add_action('add_meta_boxes', array($class, 'add_meta_box'));
 		add_action('save_post', array($class, 'save_meta'));
 		add_action('plugins_loaded', array($class, 'switch_theme'));
-		add_action('wp_loaded', array($class, 'flush_rules'));
+		add_action('save_post_'.static::$settings['post_type'], array($class, 'enable_flush'));
 		add_action('admin_enqueue_scripts', array($class, 'set_scripts'));
 		add_action('wp_ajax_check_alias', array($class, 'check_alias'));
 
 		add_filter('query_vars', array($class, 'add_vars'));
-		add_filter('post_type_link', array($class,'post_link'), 1, 3);
-		add_filter('site_url', array($class,'filter_url'));
+		add_filter('post_type_link', array($class,'post_link'),1,3);
+		add_filter('post_type_link', array($class,'filter_url'),1,3);
+		add_filter('post_link', array($class,'filter_url'),1,3);
+		add_filter('wp_nav_menu_objects', array($class, 'filter_menus'),1,1);
 	}
 
 	/**
@@ -119,7 +130,7 @@ class Cameleon {
 			,'public' => true
 			,'publicly_queryable' => false
 			,'has_archive' => false
-			,'show_in_nav_menus' => false
+			,'show_in_nav_menus' => true
 			,'menu_icon' => $settings['menu_icon']
 			,'hierarchical' => false
 			,'supports' => array('title')
@@ -131,7 +142,7 @@ class Cameleon {
 
 	/**
 	*
-	* Sets post links to root instead of under url/post_type/name
+	* Sets post_type links to root instead of under url/post_type/name. This makes the post_type visitible from the admin link.
 	*/
 	public static function post_link($post_link,$id=0) {
 		$post = get_post($id);
@@ -140,6 +151,65 @@ class Cameleon {
 			return str_replace($posttype.'/','',$post_link);
 		}
 		return $post_link;
+	}
+
+	/**
+	*
+	* Filters site url for get_permalink() function. This fixes urls retreived when in a skin
+	*
+	* @param string $post_link The link to the replaced
+	* @return string $post_link The link being sent back to Wordpress
+	*/
+	public static function filter_url($post_link,$id=0) {
+		$url = static::url_validation();
+		if ($url['theme_id']) $post_link = static::replace_url($post_link,$url['alias']);
+		return $post_link;
+	}
+
+	public static function filter_menus($items) {
+		$url = static::url_validation();
+		if ($url['theme_id']) {
+			foreach ($items as &$item) {
+				$item->url = static::replace_url($item->url,$url['alias']);
+			}
+		}
+		return $items;
+	}
+
+	/**
+	*
+	* Replaces url with url + alias
+	*
+	* @param string $url The string to replace
+	* @param string $alias The alias to add in
+	* @return string $url The replaced url
+	*/
+	private static function replace_url($url,$alias) {
+		$new_url = site_url().'/'.$alias;
+		if ( !stristr($url,$new_url) ) {
+			if ($url=='/') { $url = $new_url; }
+			else  { $url = str_replace(site_url(),$new_url,$url); }
+		}
+		return $url;
+	}
+
+	/**
+	*
+	* Checks for alias detection or re-detects
+	*
+	* @return array $ret Details from validation
+	*/
+	private static function url_validation() {
+		if (isset(static::$theme['alias']) && static::is_valid_string(static::$theme['alias'])) {
+			$ret['alias'] = static::$theme['alias'];
+			$ret['theme_id'] = get_query_var(static::$settings['query_arg']);
+
+		}
+		else {
+			$ret['alias'] = static::get_site_alias();
+			$ret['theme_id'] = static::validate_theme($ret['alias']);
+		}
+		return $ret;
 	}
 
 	/**
@@ -412,32 +482,55 @@ class Cameleon {
 	* @return string
 	*/
 	private static function get_theme() {
+		$alias = static::get_site_alias();
+		$id = static::validate_theme($alias);
+		if ($id) {
+			$themename = get_post_meta($id, static::$settings['theme_key'], true);
+			if ($themename && static::is_valid_string($themename)) {
+				static::$theme['alias'] = $alias;
+				return $themename;
+			}
+			else return false;
+		}
+		else return false;
+	}
 
-		$url = $_SERVER['REQUEST_URI'];
-
-		if (strpos($url,'/')===0) $url = substr($url,1);
-		if (strrpos($url,'/')===(strlen($url)-1)) $url = substr($url,0,(strlen($url)-1));
-		if (strpos($url,'/')) $url = substr($url,0,(strpos($url,'/')));
-
+	/**
+	*
+	* Validates the theme from url alias
+	*
+	* @param string The alias retreived from get_site_alias
+	* @return int The ID of the site to get the name for
+	*/
+	private static function validate_theme($alias) {
 		global $wpdb;
-		$page_id = $wpdb->get_var("SELECT ID FROM ".$wpdb->posts." WHERE post_name = '".$url."' AND post_type = '".static::$settings['post_type']."' LIMIT 1");
-		if (!$page_id) {
+		$id = $wpdb->get_var("SELECT ID FROM ".$wpdb->posts." WHERE post_name = '".$alias."' AND post_type = '".static::$settings['post_type']."' LIMIT 1");
+		if (!$id) {
 			$metas = $wpdb->get_results("SELECT post_id,meta_value FROM ".$wpdb->postmeta." WHERE meta_key = '".static::$settings['alias_key']."'", ARRAY_A);
 			foreach ($metas as $meta) {
 				@$addons = json_decode($meta['meta_value']);
 				if (static::is_valid_array($addons)) {
 					foreach ($addons as $addon) {
-						if ($addon==$url) $page_id = $meta['post_id'];
+						if ($addon==$alias) $id = $meta['post_id'];
 					}
 				}
 			}
 		}
-		if ($page_id) {
-			$themename = get_post_meta($page_id, static::$settings['theme_key'], true);
-			if ($themename && static::is_valid_string($themename)) return $themename;
-			else return false;
-		}
-		else return false;
+		return $id;
+	}
+
+	/**
+	*
+	* Gets the virtual site being used from the url
+	*
+	* @return string
+	*/
+	private static function get_site_alias() {
+		$url = $_SERVER['REQUEST_URI'];
+		if (strpos($url,'/')===0) $url = substr($url,1);
+		if (strrpos($url,'/')===(strlen($url)-1)) $url = substr($url,0,(strlen($url)-1));
+		if (strpos($url,'/')) $url = substr($url,0,(strpos($url,'/')));
+		return $url;
 	}
 
 	/**
@@ -516,6 +609,14 @@ class Cameleon {
 
 	/**
 	*
+	* Enables flush_rules() on post save
+	*/
+	public static function enable_flush() {
+		add_action('wp_loaded', array(get_called_class(), 'flush_rules'));
+	}
+
+	/**
+	*
 	* Flushes rewrite rules on save of microsite
 	*/
 	public static function flush_rules() {
@@ -541,15 +642,6 @@ class Cameleon {
 
 			wp_localize_script(static::$settings['post_type'].'-edit-js','cmln',$data);
 		}
-	}
-
-	/**
-	*
-	* Filters site url
-	*/
-	public static function filter_url($url) {
-
-		return $url;
 	}
 }
 
