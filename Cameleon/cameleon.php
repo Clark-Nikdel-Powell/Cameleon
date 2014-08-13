@@ -2,7 +2,7 @@
 /*
 	Plugin Name: Cameleon
 	Plugin URI: http://clarknikdelpowell.com
-	Version: 0.2.0
+	Version: 1.4.0
 	Description: Virtual Microsite Creator & Multi-Theme Enabler for WordPress
 	Author: Samuel Mello
 	Author URI: http://clarknikdelpowell.com/agency/people/sam
@@ -35,6 +35,9 @@ require_once(CMLN_PATH.'class.php');
 	post_type => The base post type to use for the skins
 	alias_key => Meta key to store the add-on aliases for each skin
 	theme_key => Meta key to store the selected theme under for each skin
+	menu_icon => The DashIcon to use for the menu
+	nonce 	  => The nonce key to use when editing meta
+	alias_warning => The warning message to display for aliases
 */
 
 $settings = array(

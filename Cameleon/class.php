@@ -7,13 +7,7 @@
 *
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
-* @version 	  1.3
-*
-*
-* Upcoming features:
-*  - URL rewrite checking & notification (for notifying of existing rewrites)
-*  - Override theme switch when registered post type url rewrite is used (fixes conflicts)
-*
+* @version 	  1.4
 */
 
 class Cameleon {
@@ -21,10 +15,10 @@ class Cameleon {
 	/**
 	* Global variables for class
 	*
-	* @param array 	$settings 	Array of settings to apply across the class
 	* @param array 	$theme 		Global theme variables set when hijacking our theme (do not set)
-	* @param array 	$rewrites 	Array of rewrites to implement for each virtual site (add as needed)
+	* @param array 	$settings 	Array of settings to apply across the class
 	*/
+	private static $theme = array();
 	private static $settings = array(
 		 'query_arg' => 'cameleon'
 		,'post_type' => 'skin' 
@@ -35,21 +29,6 @@ class Cameleon {
 		,'alias_warning' => 'Warning: using existing rewrite rules is prohibited.'
 	);
 
-	private static $theme = array();
-	/*
-	
-	ADD CATEGORY, TAGS urls
-
-	*/
-	private static $rewrites = array(
-		 '/(.+?)/page/?([0-9]{1,})/?$' => '?post_type=$matches[1]&paged=$matches[2]'
-		,'/(.+?)/tagged-as/(.+?)/?$' => '?$matches[1]-tag=$matches[2]'
-		,'/(.+?)/category/(.+?)/paged/?([0-9]{1,})/?$' => '?$matches[1]-category=$matches[2]&paged=$matches[3]'
-		,'/(.+?)/category/(.+?)/?$' => '?$matches[1]-category=$matches[2]'
-		,'/(.+?)/(.+?)/?$' => '?post_type=$matches[1]&$matches[1]=$matches[2]&name=$matches[2]'
-		,'/(.+?)/?$' => '?post_type=$matches[1]'
-		,'/?$' => ''
-	);
 
 	/**
 	*
@@ -167,6 +146,13 @@ class Cameleon {
 		return $post_link;
 	}
 
+	/**
+	*
+	* Filters site url for get_nav_menu() function. This fixes urls retreived when in a skin
+	*
+	* @param string $items The array of menu items to run through
+	* @return string $items The array of menu items being sent back to Wordpress
+	*/
 	public static function filter_menus($items) {
 		$url = static::url_validation();
 		if ($url['theme_id']) {
@@ -236,17 +222,19 @@ class Cameleon {
 	public static function save_meta() {
 
 		$current = get_current_screen();
-		if ($current->base==='post' && $current->post_type===static::$settings['post_type']) {
+		if ( $current->base === 'post' && $current->post_type === static::$settings['post_type'] ) {
 
 			$alias_key = static::$settings['alias_key'];
 			$theme_key = static::$settings['theme_key'];
 			$nonce = static::$settings['nonce'];
 			$post_type = static::$settings['post_type'];
-			$post_id = $_POST['post_ID'];
 
 			if (!isset($_POST[$nonce])) return;
 			if (!wp_verify_nonce($_POST[$nonce], $nonce)) return;
 			if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+
+			$post_id = $_POST['post_ID'];
+
 			if (!current_user_can('edit_post',$post_id)) return;
 			if (!isset($_POST[$theme_key]) || !isset($_POST[$alias_key])) return;
 
@@ -269,41 +257,51 @@ class Cameleon {
 	* Validates the Alias to avoid conflicts
 	*/
 	public static function check_alias() {
-		global $wp_rewrite;
-
+		
 		$ret['status'] = 202;
 		$ret['message'] = static::$settings['alias_warning'];
 		$ret['errors'] = array();
 
 		$aliases = $_POST['aliases'];
-		if (is_object($wp_rewrite) && isset($aliases) && count($aliases)>0) {
+		if ( isset( $aliases ) && count( $aliases ) > 0 ) {
 
 			$current_aliases_meta = get_post_meta($_POST['post'],static::$settings['alias_key'],true);
 			$current_aliases = json_decode($current_aliases_meta);
 
-			$rules = $wp_rewrite->rules;
-			$rules_e = $wp_rewrite->extra_rules;
-			$rules_e_top = $wp_rewrite->extra_rules_top;
-			$end = '/?$';
+			global $wp_rewrite;
+			$rules = $wp_rewrite->rewrite_rules();
 
-			/*
-				ADD IN DETECTION FOR REGISTERED POST TYPES
-			*/
-
-			foreach ($aliases as $name=>$alias) {
+			foreach ( $aliases as $name=>$alias ) {
 				$fail = false;
-				if ((isset($rules[$alias.$end]) || isset($rules_e[$alias.$end]) || isset($rules_e_top[$alias.$end])) && !in_array($alias,$current_aliases)) $fail = true;
-				elseif (count(array_keys($aliases,$alias))>1) $fail = true;
-
-				if ($fail===true) $ret['errors'][] = $name;
+				if ( ( static::check_rules( $rules, $alias ) ) && !in_array( $alias, $current_aliases ) ) { $fail = true; }
+				elseif ( count( array_keys( $aliases, $alias ) ) > 1 ) { $fail = true; }
+				if ( $fail===true ) { $ret['errors'][] = $name; }
 			}
-			if (count($ret['errors'])>0) {
+			if ( count( $ret['errors'] ) > 0 ) {
 				$ret['status'] = 500;
 				$ret['message'] = 'This alias already exists as a rewrite rule, alias, or is listed twice above. Publish has been disabled.';
 			}
 		}
 		echo json_encode($ret);
 		die();
+	}
+
+	/**
+	*
+	* Loops through rules and checks for this name to be taken
+	*
+	* @param array $rules Array of rewrite rules to check against
+	* @param string $alias The alias to check
+	* @return boolean $return Whether this passed or failed
+	*/
+	private static function check_rules($rules, $alias) {
+		$return = false;
+		if ( count($rules) > 0 ) {
+			$err = 0;
+			foreach ($rules as $rule=>$match) { if ( strpos($rule, $alias.'/') === 0) $err++; }
+			if ( $err > 0) $return = true;
+		}
+		return $return;
 	}
 
 	/**
