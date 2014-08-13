@@ -1,5 +1,6 @@
 <?php
 
+
 /**
 *
 * Cameleon; the theme changing plugin for WordPress
@@ -62,7 +63,6 @@ class Cameleon {
 
 		$class = get_called_class();
 
-		add_action('init', array($class, 'add_rewrites'));
 		add_action('init', array($class, 'register'));
 		add_action('add_meta_boxes', array($class, 'add_meta_box'));
 		add_action('save_post', array($class, 'save_meta'));
@@ -71,6 +71,7 @@ class Cameleon {
 		add_action('admin_enqueue_scripts', array($class, 'set_scripts'));
 		add_action('wp_ajax_check_alias', array($class, 'check_alias'));
 
+		add_filter('rewrite_rules_array', array($class, 'add_rewrites'));
 		add_filter('query_vars', array($class, 'add_vars'));
 		add_filter('post_type_link', array($class,'post_link'),1,3);
 		add_filter('post_type_link', array($class,'filter_url'),1,3);
@@ -424,13 +425,10 @@ class Cameleon {
 			 'posts_per_page' => -1
 			,'post_type'		=> static::$settings['post_type']
 		);
-
 		$sites = get_posts($args);
 		$urls = array();
 		if (static::is_valid_array($sites)) {
-
 			foreach ($sites as $site) {
-
 				$urls[$site->ID][] = $site->post_name;
 				$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
 
@@ -442,36 +440,36 @@ class Cameleon {
 				}
 			}
 		}
-
 		if (static::is_valid_array($urls)) return $urls;
 		else return false;
 	}
 
 	/**
 	*
-	* Adds the rewrite rules into WordPress
+	* Adds the rewrite rules into the Wordpress rewrite rules array (prepend)
+	*
+	* @param object $rules Rules passed from Wordpress
+	* @return object $rules Rules after insertions / modifications
 	*/
-	public static function add_rewrites() {
-		$rootpage = 'index.php';
+	public static function add_rewrites($rules) {
+		$new_rules = array();
 		$sites = static::get_sites();
 		if ($sites) {
 			foreach ($sites as $site=>$urls) {
+				$var = static::$settings['query_arg'].'='.$site;
 				foreach ($urls as $url) {
-					foreach (static::$rewrites as $rewrite_match=>$rewrite_to) {
-
-						$var = static::$settings['query_arg'].'='.$site;
-						if (strlen($rewrite_to)>0) $var = '&'.$var;
-						else $var = '?'.$var;
-
-						add_rewrite_rule(
-							 $url.$rewrite_match
-							,$rootpage.$rewrite_to.$var
-							,'top'
-						);
+					$new_rules[$url.'/?$'] = 'index.php?'.$var;
+					foreach ($rules as $rewrite_match=>$rewrite_to) {
+						$new_match = $url.'/'.$rewrite_match;
+						$new_rules[$new_match] = $rewrite_to.'&'.$var;
 					}
 				}
 			}
+			if ( count($new_rules) > 0 ) {
+				$rules = array_merge($new_rules,$rules);
+			}
 		}
+		return $rules;
 	}
 
 	/**
