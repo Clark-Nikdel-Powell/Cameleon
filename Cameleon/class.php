@@ -433,6 +433,12 @@ class Cameleon {
 			}
 		}
 		if ($page_id) {
+
+			$page = get_posts('include='. $page_id .'&post_type='.static::$settings['post_type']);
+			if ( !is_user_logged_in() && $page->post_status != 'publish') {
+				return false;
+			}
+
 			$themename = get_post_meta($page_id, static::$settings['theme_key'], true);
 			if ($themename && static::is_valid_string($themename)) return $themename;
 			else return false;
