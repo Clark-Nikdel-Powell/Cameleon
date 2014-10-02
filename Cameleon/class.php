@@ -20,7 +20,7 @@ class Cameleon {
 	private static $theme = array();
 	private static $settings = array(
 		 'query_arg' => 'cameleon'
-		,'post_type' => 'skin' 
+		,'post_type' => 'skin'
 		,'alias_key' => 'skin_alias'
 		,'theme_key' => 'skin_theme'
 		,'menu_icon' => 'dashicons-art'
@@ -256,7 +256,7 @@ class Cameleon {
 	* Validates the Alias to avoid conflicts
 	*/
 	public static function check_alias() {
-		
+
 		$ret['status'] = 202;
 		$ret['message'] = static::$settings['alias_warning'];
 		$ret['errors'] = array();
@@ -480,6 +480,12 @@ class Cameleon {
 		$alias = static::get_site_alias();
 		$id = static::validate_theme($alias);
 		if ($id) {
+
+			$page = get_posts('include='. $id .'&post_type='.static::$settings['post_type']);
+			if ( !is_user_logged_in() && $page->post_status != 'publish') {
+				return false;
+			}
+
 			$themename = get_post_meta($id, static::$settings['theme_key'], true);
 			if ($themename && static::is_valid_string($themename)) {
 				static::$theme['alias'] = $alias;
