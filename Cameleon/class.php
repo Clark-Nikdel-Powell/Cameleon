@@ -1,6 +1,5 @@
 <?php
 
-
 /**
 *
 * Cameleon; the theme changing plugin for WordPress
@@ -108,7 +107,7 @@ class Cameleon {
 		$args = array(
 			 'labels' => $labels
 			,'public' => true
-			,'publicly_queryable' => false
+			,'publicly_queryable' => true
 			,'has_archive' => false
 			,'show_in_nav_menus' => true
 			,'menu_icon' => $settings['menu_icon']
