@@ -482,8 +482,8 @@ class Cameleon {
 		$id = static::validate_theme($alias);
 		if ($id) {
 
-			$page = get_posts('include='. $id .'&post_type='.static::$settings['post_type']);
-			if ( !is_user_logged_in() && $page->post_status != 'publish') {
+			$page = array_shift(get_posts('include='. $id .'&post_type='.static::$settings['post_type']));
+			if ( !is_user_logged_in() && $page->post_status != 'publish' ) {
 				return false;
 			}
 
