@@ -6,7 +6,7 @@
 *
 * @package    Cameleon
 * @author     Samuel Mello <sam@clarknikdelpowell.com
-* @version 	  1.4
+* @version 	  1.5
 */
 
 class Cameleon {
