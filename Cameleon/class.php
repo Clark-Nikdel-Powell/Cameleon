@@ -55,11 +55,11 @@ class Cameleon {
 		add_filter('post_type_link', array($class,'post_link'),1,2);
 
 		add_filter('post_type_link', array($class,'filter_url'),1,2);
+		add_filter('post_type_archive_link', array($class,'filter_url'),1,2);
 		add_filter('post_link', array($class,'filter_url'),1,2);
 		add_filter('term_link', array($class,'filter_url'),1,2);
 		add_filter('page_link', array($class,'filter_url'),1,2);
 
-		add_filter('post_type_archive_link', array($class,'filter_url'),1,2);
 		add_filter('wp_nav_menu_objects', array($class, 'filter_menus'),1,1);
 	}
 
@@ -147,7 +147,9 @@ class Cameleon {
 	*/
 	public static function filter_url($post_link,$id=0) {
 		$url = static::url_validation();
-		if ($url['theme_id']) $post_link = static::replace_url($post_link,$url['alias']);
+		if ($url['theme_id'] && !static::is_valid_site(static::get_request_from_url($post_link))) {
+			$post_link = static::replace_url($post_link,$url['alias']);
+		}
 		return $post_link;
 	}
 
@@ -162,10 +164,27 @@ class Cameleon {
 		$url = static::url_validation();
 		if ($url['theme_id']) {
 			foreach ($items as &$item) {
-				$item->url = static::replace_url($item->url,$url['alias']);
+				if ( !static::is_valid_site(static::get_request_from_url($item->url)) ) {
+					$item->url = static::replace_url($item->url,$url['alias']);
+				}
 			}
 		}
 		return $items;
+	}
+
+	/**
+	*
+	* Gets the rest of the url after site_url() for site detection
+	*
+	* @param string $url The url to parse
+	* @return string $url The parsed url.
+	*/
+	private static function get_request_from_url($url) {
+		$request_file = str_ireplace(site_url() . '/', '', $url);
+		if ( substr($request_file, strlen($request_file)-1) === '/' ) {
+			$request_file = substr($request_file, 0, strlen($request_file)-1);
+		}
+		return $request_file;
 	}
 
 	/**
@@ -178,13 +197,7 @@ class Cameleon {
 	*/
 	private static function replace_url($url,$alias) {
 		$new_url = site_url().'/'.$alias;
-
-		$request_file = str_ireplace(site_url() . '/', '', $url);
-		if ( substr($request_file, strlen($request_file)-1) === '/' ) {
-			$request_file = substr($request_file, 0, strlen($request_file)-1);
-		}
-
-		if ( !stristr($url,$new_url) && !static::is_valid_site($request_file) ) {
+		if ( !stristr($url,$new_url) ) {
 			if ($url=='/') { $url = $new_url; }
 			else  { $url = str_replace(site_url(),$new_url,$url); }
 		}
