@@ -51,9 +51,14 @@ class Cameleon {
 
 		add_filter('rewrite_rules_array', array($class, 'add_rewrites'));
 		add_filter('query_vars', array($class, 'add_vars'));
-		add_filter('post_type_link', array($class,'post_link'),1,3);
-		add_filter('post_type_link', array($class,'filter_url'),1,3);
-		add_filter('post_link', array($class,'filter_url'),1,3);
+		add_filter('post_type_link', array($class,'post_link'),1,2);
+
+		add_filter('post_type_link', array($class,'filter_url'),1,2);
+		add_filter('post_link', array($class,'filter_url'),1,2);
+		add_filter('term_link', array($class,'filter_url'),1,2);
+		add_filter('page_link', array($class,'filter_url'),1,2);
+
+		add_filter('post_type_archive_link', array($class,'filter_url'),1,2);
 		add_filter('wp_nav_menu_objects', array($class, 'filter_menus'),1,1);
 	}
 
