@@ -18,6 +18,7 @@ class Cameleon {
 	* @param array 	$settings 	Array of settings to apply across the class
 	*/
 	private static $theme = array();
+	private static $sites = array();
 	private static $settings = array(
 		 'query_arg' => 'cameleon'
 		,'post_type' => 'skin'
@@ -177,7 +178,13 @@ class Cameleon {
 	*/
 	private static function replace_url($url,$alias) {
 		$new_url = site_url().'/'.$alias;
-		if ( !stristr($url,$new_url) ) {
+
+		$request_file = str_ireplace(site_url() . '/', '', $url);
+		if ( substr($request_file, strlen($request_file)-1) === '/' ) {
+			$request_file = substr($request_file, 0, strlen($request_file)-1);
+		}
+
+		if ( !stristr($url,$new_url) && !static::is_valid_site($request_file) ) {
 			if ($url=='/') { $url = $new_url; }
 			else  { $url = str_replace(site_url(),$new_url,$url); }
 		}
@@ -422,28 +429,60 @@ class Cameleon {
 	* @return array
 	*/
 	private static function get_sites() {
+		$cache = static::$sites;
+		if ( count($cache) === 0 ) {
+			$args = array(
+				 'posts_per_page' => -1
+				,'post_type'		=> static::$settings['post_type']
+			);
+			$sites = get_posts($args);
+			$urls = array();
+			if (static::is_valid_array($sites)) {
+				foreach ($sites as $site) {
+					$urls[$site->ID][] = $site->post_name;
+					$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
 
-		$args = array(
-			 'posts_per_page' => -1
-			,'post_type'		=> static::$settings['post_type']
-		);
-		$sites = get_posts($args);
-		$urls = array();
-		if (static::is_valid_array($sites)) {
-			foreach ($sites as $site) {
-				$urls[$site->ID][] = $site->post_name;
-				$addons = get_post_meta($site->ID, static::$settings['alias_key'], true);
-
-				if (static::is_valid_string($addons) && @json_decode($addons)) @$addons = json_decode($addons);
-				if (static::is_valid_array($addons) && count($addons)>0) {
-					foreach ($addons as $addon) {
-						$urls[$site->ID][] = $addon;
+					if (static::is_valid_string($addons) && @json_decode($addons)) @$addons = json_decode($addons);
+					if (static::is_valid_array($addons) && count($addons)>0) {
+						foreach ($addons as $addon) {
+							$urls[$site->ID][] = $addon;
+						}
 					}
 				}
 			}
 		}
-		if (static::is_valid_array($urls)) return $urls;
-		else return false;
+		else {
+			$urls = $cache;
+		}
+
+		if (static::is_valid_array($urls)) {
+			static::$sites = $urls;
+			return $urls;
+		}
+		else {
+			return false;
+		}
+	}
+
+	/**
+	*
+	* Validates the given site name against the cached (or non caches) site list
+	*
+	* @param string $name 	The name of the site to check
+	* @return bool
+	*/
+	private static function is_valid_site($name) {
+		$sites = static::get_sites();
+		if ( is_array($sites) && count($sites) > 0 ) {
+			foreach ( $sites as $site_id => $urls ) {
+				foreach ( $urls as $url ) {
+					if ( $url === $name ) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
