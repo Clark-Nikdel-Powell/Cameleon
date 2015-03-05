@@ -2,12 +2,10 @@
 /*
 	Plugin Name: Cameleon
 	Plugin URI: https://github.com/Clark-Nikdel-Powell/Cameleon
-	Version: 1.4.0
+	Version: 1.6.0
 	Description: Virtual Microsite Creator & Multi-Theme Enabler for WordPress
 	Author: Samuel Mello
 	Author URI: http://clarknikdelpowell.com/agency/people/sam
-
-	Copyright 2014+ Clark/Nikdel/Powell (email : sam@clarknikdelpowell.com)
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License, version 2 (or later),
@@ -22,9 +20,6 @@
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
-
-	error_reporting(E_ALL | E_STRICT);
-	ini_set('display_errors', 1);
 
 define('CMLN_LOCAL',    ($_SERVER['SERVER_NAME'] == 'localhost' || $_SERVER['SERVER_NAME'] == '127.0.0.1'));
 define('CMLN_PATH',     plugin_dir_path(__FILE__));
