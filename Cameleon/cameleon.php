@@ -1,7 +1,7 @@
 <?php
 /*
 	Plugin Name: Cameleon
-	Plugin URI: http://clarknikdelpowell.com
+	Plugin URI: https://github.com/Clark-Nikdel-Powell/Cameleon
 	Version: 1.4.0
 	Description: Virtual Microsite Creator & Multi-Theme Enabler for WordPress
 	Author: Samuel Mello
@@ -23,29 +23,38 @@
 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+	error_reporting(E_ALL | E_STRICT);
+	ini_set('display_errors', 1);
+
 define('CMLN_LOCAL',    ($_SERVER['SERVER_NAME'] == 'localhost' || $_SERVER['SERVER_NAME'] == '127.0.0.1'));
 define('CMLN_PATH',     plugin_dir_path(__FILE__));
 define('CMLN_URL',      CMLN_LOCAL ? plugins_url().'/Cameleon/' : plugin_dir_url(__FILE__));
 
-/* Include Class */
-require_once(CMLN_PATH.'class.php');
+// include the class
+require_once(CMLN_PATH.'class.Cameleon.php');
 
-/* 
-	query_arg => The query argument to add to the $_GET request
-	post_type => The base post type to use for the skins
-	alias_key => Meta key to store the add-on aliases for each skin
-	theme_key => Meta key to store the selected theme under for each skin
-	menu_icon => The DashIcon to use for the menu
-	nonce 	  => The nonce key to use when editing meta
-	alias_warning => The warning message to display for aliases
-*/
 
 $settings = array(
-	 'query_arg' => 'fdoc_site'
-	,'post_type' => 'microsite'
-	,'alias_key' => 'fdoc_microsite_add_on_urls'
-	,'theme_key' => 'fdoc_microsite_theme'
-	,'menu_icon' => 'dashicons-admin-site'
+	// The query args
+	'query_arg' 	=> 'cameleon'
+	// the post type settings
+,	'post_type' 	=> array(
+		// key name of post type (lowercase, no spaces, etc)
+		'name' 		=> 'skin'
+		// the plural name of the post name
+	,	'plural' 	=> 'skins'
+		// the icon to use in the menu bar
+	,	'icon'		=> 'dashicons-art'
+	)
+	// the meta key for aliases
+,	'alias_key' 	=> 'skin_alias'
+	// the meta key for skins
+,	'theme_key' 	=> 'skin_theme'
+	// the nonce name / id
+,	'nonce'	 		=> 'cameleon-nonce'
+	// The message to display when aliases are used already
+,	'alias_warning' => 'Warning: using existing rewrite rules is prohibited.'
 );
 
-Cameleon::initialize($settings);
+// instantiate plugin
+$cmln = new Cameleon($settings);
